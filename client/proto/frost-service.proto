@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package topos.topos_node.v1;
+option go_package = "/client/proto";
+
+message FrostMessageData {
+  oneof data {
+    string value = 1;
+  }
+}
+
+message FrostMessage {
+  string messageId = 1;
+  string from = 2;
+  FrostMessageData data = 3;
+  string signature = 4;
+}
+
+message PolygonEdgeValidator {
+  string value = 1;
+}
+
+message UUID {
+  uint64 most_significant_bits = 1;
+  uint64 least_significant_bits = 2;
+}
+
+message SubmitFrostMessageRequest {
+  FrostMessage frost_message = 1;
+}
+
+message SubmitFrostMessageResponse {}
+
+message WatchFrostMessagesRequest {
+  // Provide a request_id to track response
+  //topos.shared.v1.UUID request_id = 1;
+  UUID request_id = 1;
+
+  // Define which command needs to be performed
+  oneof command {
+    OpenStream open_stream = 2;
+  }
+
+  // Sent once to start receiving events and being able to send further command
+  message OpenStream {
+    repeated PolygonEdgeValidator validator_ids = 1;
+  }
+}
+
+message WatchFrostMessagesResponse {
+  // If the response is directly linked to a request this ID allow one to track it
+  UUID request_id = 1;
+
+  oneof event {
+    StreamOpened stream_opened = 2;
+    FrostMessagePushed frost_message_pushed = 3;
+  }
+
+  // Sent by the TCE when the stream is ready to be used and that certificates will start being push
+  message StreamOpened {
+    repeated PolygonEdgeValidator validator_ids = 1;
+  }
+
+  // Main message pushed to the stream
+  message FrostMessagePushed {
+    FrostMessage frost_message = 1;
+  }
+}
+
+
+service FrostAPIService {
+  rpc SubmitFrostMessage(SubmitFrostMessageRequest) returns (SubmitFrostMessageResponse);
+
+  // This RPC allows a client to open a bidirectional stream with a Topos Node
+  rpc WatchFrostMessages(stream WatchFrostMessagesRequest) returns (stream WatchFrostMessagesResponse);
+}
