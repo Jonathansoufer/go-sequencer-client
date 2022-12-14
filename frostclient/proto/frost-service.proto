@@ -17,7 +17,7 @@ message FrostMessage {
 }
 
 message PolygonEdgeValidator {
-  string value = 1;
+  string address = 1;
 }
 
 message UUID {

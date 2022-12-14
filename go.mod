@@ -1,8 +1,9 @@
-module github.com/toposware/go-topos-sequencer-client
+module github.com/topos-network/go-topos-sequencer-client
 
 go 1.19
 
 require (
+	github.com/google/uuid v1.1.2
 	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 )

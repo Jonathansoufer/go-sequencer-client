@@ -1,65 +1,73 @@
 package main
 
 import (
-	"context"
+	"bufio"
 	"fmt"
-	"io"
 	"log"
-	"time"
+	"os"
 
-	pb "github.com/toposware/go-topos-sequencer-client/client/proto"
-	"google.golang.org/grpc"
+	"github.com/topos-network/go-topos-sequencer-client/frostclient"
+	pb "github.com/topos-network/go-topos-sequencer-client/frostclient/proto"
 )
 
+func readString(reader *bufio.Reader) string {
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		log.Fatalf("error reading terminal input: %v", err)
+	}
+	fmt.Println("Line readed:", line)
+	return line
+}
+
 func main() {
-	fmt.Println("Starting go client")
-	url := "127.0.0.1:4001"
+	serverAddress := os.Args[1]
+	validatorAccount := os.Args[2]
 
-	conn, err := grpc.Dial(url, grpc.WithInsecure())
+	frostServiceClient, err := frostclient.NewFrostServiceClient(serverAddress, validatorAccount)
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
-	defer conn.Close()
-
-	// create stream
-	client := pb.NewFrostAPIServiceClient(conn)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	stream, err := client.WatchFrostMessages(ctx)
-	if err != nil {
-		log.Fatalf("openn stream error %v", err)
+		log.Fatalf("could not instantiate frost client: %v", err)
+		return
 	}
 
-	waitc := make(chan struct{})
+	// Wait for message from service
+	fmt.Println("Starting main loop")
+
+	reader := bufio.NewReader(os.Stdin)
+	line := make(chan string)
+
 	go func() {
-		fmt.Println("Starting receive loop")
+		var index = 0
 		for {
-			in, err := stream.Recv()
-			if err == io.EOF {
-				close(waitc)
-				return
+			message := <-line
+			fmt.Println("Sending message to server: ", message)
+			index = index + 1
+			request := &pb.SubmitFrostMessageRequest{
+				FrostMessage: &pb.FrostMessage{
+					MessageId: string(index),
+					From:      validatorAccount,
+					Data: &pb.FrostMessageData{
+						Data: &pb.FrostMessageData_Value{
+							Value: message,
+						},
+					},
+					Signature: "",
+				},
 			}
+			_, err := frostServiceClient.Client.SubmitFrostMessage(frostServiceClient.Ctx, request)
 			if err != nil {
-				log.Fatalf("client.WatchFrostMessages failed: %v", err)
+				fmt.Println("Error submiting frost message to service: %v", err)
 			}
-			log.Printf("Got message", in)
+
 		}
 	}()
 
-	event := &pb.WatchFrostMessagesRequest{RequestId: &pb.UUID{}, Command: &pb.WatchFrostMessagesRequest_OpenStream_{
-		OpenStream: &pb.WatchFrostMessagesRequest_OpenStream{
-			ValidatorIds: []*pb.PolygonEdgeValidator{},
-		},
-	}}
+	for {
+		select {
+		case message := <-frostServiceClient.Inbox:
+			fmt.Println("Received message:", message)
+		case line <- readString(reader):
 
-	if err := stream.Send(event); err != nil {
-		log.Fatalf("client.EventStream: stream.Send(%v) failed: %v", event, err)
+		}
 	}
-	stream.CloseSend()
-	<-waitc
-
-	fmt.Println("Ending go client")
 
 }
