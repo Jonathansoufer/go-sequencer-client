@@ -2,7 +2,6 @@ package frostclient
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"math/rand"
@@ -60,7 +59,7 @@ func NewFrostServiceClient(serverAddress string, validatorAccount string) (*Fros
 		},
 	}}
 
-	log.Printf("Sending watch frost message request to the service", request)
+	// Sending watch frost message request to the service
 	if err := stream.Send(request); err != nil {
 		log.Fatalf("client.EventStream: stream.Send(%v) failed: %v", request, err)
 		return nil, err
@@ -80,7 +79,6 @@ func NewFrostServiceClient(serverAddress string, validatorAccount string) (*Fros
 
 func receive(closec chan struct{},
 	stream pb.FrostAPIService_WatchFrostMessagesClient) *pb.WatchFrostMessagesResponse {
-	fmt.Println("Waiting for message from service...")
 	in, err := stream.Recv()
 	if err == io.EOF {
 		log.Fatalf("client.WatchFrostMessages EOF")
@@ -89,13 +87,12 @@ func receive(closec chan struct{},
 	if err != nil {
 		log.Fatalf("client.WatchFrostMessages failed: %v", err)
 	}
-	log.Printf("Received frost message", in)
 	return in
 }
 
 func processFrostMessages(closec chan struct{}, inbox chan *pb.WatchFrostMessagesResponse,
 	stream pb.FrostAPIService_WatchFrostMessagesClient) {
-	fmt.Println("Starting frost messages processing loop")
+	log.Println("Starting frost messages processing loop")
 	for {
 		select {
 		case inbox <- receive(closec, stream):
